@@ -13,11 +13,22 @@ yf_rss_url = 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=%s&region=US&la
 #yf_rss_url = 'https://www.yahoo.com/news/rss'
 
 def get_yf_rss(ticker):
-
     feed = feedparser.parse(yf_rss_url % ticker)
 #    feed = feedparser.parse(yf_rss_url)
 
     return feed.entries
+
+def print_news(ticker, entry, score):
+    print("\n{} TITLE: {}".format(ticker, entry['title']))
+    published = entry['published_parsed']
+    dt = datetime.fromtimestamp(mktime(published))
+    print("   Published at " + str(dt.date()) + " " + str(dt.time()))
+    print("   Score compound {}: neg: {} new: {} pos{} ".format(score['compound'], score['neg'], score['neu'], score['pos']))
+
+def print_scored_news(entry):
+    print("\n{} - {} {}: {}".format(entry['ticker'], str(entry['date']), str(entry['time']), entry['headline']))
+    dt = datetime.fromtimestamp(mktime(published))
+    print("    SCORE compound: {} (neg: {} new: {} pos: {})".format(entry['compound'], entry['neg'], entry['neu'], entry['pos']))
 
 if __name__ == '__main__':
     ticker = 'INTC'
@@ -27,11 +38,14 @@ if __name__ == '__main__':
     i = 0
     all_news = []
     for entry in entries:
-        #print("\nSUMMARY " + str(i))
-        print("\nTITLE #" + str(i) + ":" + entry['title'])
         published = entry['published_parsed']
         dt = datetime.fromtimestamp(mktime(published))
-        print("   Publshed at " + str(dt.date()) + " " + str(dt.time()))
+
+        #DEBUG prints
+        #print("\nSUMMARY " + str(i))
+        #print("\nTITLE #" + str(i) + ":" + entry['title'])
+        #print("   Publshed at " + str(dt.date()) + " " + str(dt.time()))
+
         news = []
         news.append(ticker)
         news.append(dt.date())
@@ -54,7 +68,26 @@ if __name__ == '__main__':
     # Iterate through the headlines and get the polarity scores using vader
     scores = parsed_and_scored_news['headline'].apply(vader.polarity_scores).tolist()
 
-    i = 0
-    for score in scores:
-        print("#{} neg: {} new: {} pos{} compound {}".format(i, score['neg'], score['neu'], score['pos'], score['compound']))
-        i = i + 1
+    #DEBUG PRINT
+    #i = 0
+    #for score in scores:
+    #    #print("#{} neg: {} new: {} pos{} compound {}".format(i, score['neg'], score['neu'], score['pos'], score['compound']))
+    #    if score['compound'] > 0.3 or score['compound'] < -0.3:
+    #        print_news(ticker, entries[i], score)
+    #    i = i + 1
+
+    # Convert the 'scores' list of dicts into a DataFrame
+    scores_df = pd.DataFrame(scores)
+    # Join the DataFrames of the news and the list of dicts
+    parsed_and_scored_news = parsed_and_scored_news.join(scores_df, rsuffix='_right')
+    # Convert the date column from string to datetime
+    parsed_and_scored_news['date'] = pd.to_datetime(parsed_and_scored_news.date).dt.date
+
+
+    parsed_and_scored_news.head()
+    for index, news_item in parsed_and_scored_news.iterrows():
+        #DEBUG PRINT
+        #print(str(news_item['compound']))
+        if news_item['compound'] > 0.3 or news_item['compound'] < -0.3:
+            print_scored_news(news_item)
+
