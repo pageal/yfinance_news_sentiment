@@ -103,5 +103,5 @@ def scan_yf_news(score_threshold = 0.3, ticker = 'INTC'):
                 print_scored_news(news_item)
 
 if __name__ == '__main__':
-    scan_yf_news(ticker=None)
+    scan_yf_news(score_threshold=0.5, ticker=None)
     scan_yf_news(ticker='INTC')
