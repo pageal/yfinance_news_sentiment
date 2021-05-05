@@ -10,7 +10,7 @@ import pandas as pd
 import nltk
 
 yf_rss_ticket_url = 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=%s&region=US&lang=en-US'
-yf_rss_url = 'https://www.yahoo.com/news/rss'
+yf_rss_url = 'https://finance.yahoo.com/news/rssindex'
 
 def get_yf_rss():
     feed = feedparser.parse(yf_rss_url)
@@ -31,10 +31,15 @@ def print_scored_ticker_news(entry):
     print("\n{} - {} {}: {}".format(entry['ticker'], str(entry['date']), str(entry['time']), entry['headline']))
     print("    SCORE compound: {} (neg: {} new: {} pos: {})".format(entry['compound'], entry['neg'], entry['neu'], entry['pos']))
 
-def scan_ticker_news():
-    ticker = 'INTC'
-    #    entries = get_yf_rss("AAPL")
-    entries = get_yf_ticker_rss(ticker)
+def print_scored_news(entry):
+    print("\n{} {}: {}".format(str(entry['date']), str(entry['time']), entry['headline']))
+    print("    SCORE compound: {} (neg: {} new: {} pos: {})".format(entry['compound'], entry['neg'], entry['neu'], entry['pos']))
+
+def scan_yf_news(score_threshold = 0.3, ticker = 'INTC'):
+    if(ticker != None):
+        entries = get_yf_ticker_rss(ticker)
+    else:
+        entries = get_yf_rss()
 
     i = 0
     all_news = []
@@ -48,7 +53,8 @@ def scan_ticker_news():
         # print("   Publshed at " + str(dt.date()) + " " + str(dt.time()))
 
         news = []
-        news.append(ticker)
+        if (ticker != None):
+            news.append(ticker)
         news.append(dt.date())
         news.append(dt.time())
         news.append(entry['title'])
@@ -57,15 +63,17 @@ def scan_ticker_news():
         # print(entry)
         i = i + 1
 
+
+    if (ticker != None):
+        columns = ['ticker', 'date', 'time', 'headline']
+    else:
+        columns = ['date', 'time', 'headline']
+
     # Instantiate the sentiment intensity analyzer
     nltk.download("vader_lexicon")
     vader = SentimentIntensityAnalyzer()
-
-    columns = ['ticker', 'date', 'time', 'headline']
-
     # Convert the parsed_news list into a DataFrame called 'parsed_and_scored_news'
     parsed_and_scored_news = pd.DataFrame(all_news, columns=columns)
-
     # Iterate through the headlines and get the polarity scores using vader
     scores = parsed_and_scored_news['headline'].apply(vader.polarity_scores).tolist()
 
@@ -88,9 +96,12 @@ def scan_ticker_news():
     for index, news_item in parsed_and_scored_news.iterrows():
         # DEBUG PRINT
         # print(str(news_item['compound']))
-        if news_item['compound'] > 0.3 or news_item['compound'] < -0.3:
-            print_scored_ticker_news(news_item)
-
+        if news_item['compound'] > score_threshold or news_item['compound'] < (-1*score_threshold):
+            if (ticker != None):
+                print_scored_ticker_news(news_item)
+            else:
+                print_scored_news(news_item)
 
 if __name__ == '__main__':
-    scan_ticker_news()
+    scan_yf_news(ticker=None)
+    scan_yf_news(ticker='INTC')
