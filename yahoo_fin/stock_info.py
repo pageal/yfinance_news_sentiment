@@ -165,8 +165,6 @@ def tickers_nasdaq(include_company_data = False):
     ftp.close()    
 
     return tickers
-    
-    
 
 def tickers_other(include_company_data = False):
     '''Downloads list of tickers currently listed in the "otherlisted.txt"
@@ -398,6 +396,49 @@ def _parse_table(json_info):
     return df
 
 
+cache_flow_columns = None
+cache_flow_statements = []
+
+#line per-ticker table: each line has ticker name and free-cash-flow values for 4 consecuent years
+cache_flow_columns_all = ['Ticker'] #the header
+cache_flow_statements_for_all = [] #the table array
+
+def collect_statements(ticker, json_info):
+    global cache_flow_columns
+    global cache_flow_statements
+    global cache_flow_columns_all
+    global cache_flow_statements_for_all
+    df = pd.DataFrame(json_info)
+    del df["maxAge"]
+
+    df.set_index("endDate", inplace=True)
+    df.index = pd.to_datetime(df.index, unit="s")
+    df.index.name = "Breakdown"
+
+    the_total_row = [ticker]
+
+    if(cache_flow_columns is None):
+        cache_flow_columns = df.columns
+
+    for index, statement in df.iterrows():
+        the_row = statement.to_list()
+        statement_date = str(index).split(" ")[0]
+        statement_year = statement_date.split("-")[0]
+        operations = statement['totalCashFromOperatingActivities']
+        investing = statement['totalCashflowsFromInvestingActivities'] # + statement['otherCashflowsFromInvestingActivities']
+        finansing = statement['totalCashFromFinancingActivities'] + statement['otherCashflowsFromFinancingActivities']
+        capital_expendatures = statement['capitalExpenditures']
+        free_csh_flow = operations + capital_expendatures #+ finansing #+ investing
+        the_row = [ticker] + [statement_year] + [free_csh_flow] + the_row
+        cache_flow_statements.append(the_row)
+        #collect per-ticker yearly data into a single line
+        if(len(cache_flow_columns_all) < 5):
+            cache_flow_columns_all.append("{}".format(statement_year))
+        the_total_row = the_total_row + [free_csh_flow]
+    cache_flow_statements_for_all.append(the_total_row)
+    print("collect_statements done for {}".format(ticker))
+
+
 def get_income_statement(ticker, yearly = True):
     
     '''Scrape income statement from Yahoo Finance for a given ticker
@@ -457,7 +498,27 @@ def get_cash_flow(ticker, yearly = True):
     else:
         temp = json_info["cashflowStatementHistoryQuarterly"]["cashflowStatements"]
         
-    return _parse_table(temp)      
+    return _parse_table(temp)
+
+
+def get_cash_flow_pg(ticker, yearly=True):
+    '''Scrapes the cash flow statement from Yahoo Finance for an input ticker
+
+       @param: ticker
+    '''
+
+    cash_flow_site = "https://finance.yahoo.com/quote/" + \
+                     ticker + "/cash-flow?p=" + ticker
+
+    json_info = _parse_json(cash_flow_site)
+
+    if yearly:
+        temp = json_info["cashflowStatementHistory"]["cashflowStatements"]
+    else:
+        temp = json_info["cashflowStatementHistoryQuarterly"]["cashflowStatements"]
+
+    collect_statements(ticker, temp)
+    return cache_flow_statements
 
 
 def get_financials(ticker, yearly = True, quarterly = True):
@@ -968,9 +1029,44 @@ def get_postmarket_price(ticker):
         return quote_data["postMarketPrice"]
     
     raise AssertionError("Postmarket price not currently available.")
-    
+
+from tickers import tickers_pg
+
+def get_cash_flow_for_all():
+    #tickers_nyse_amex = tickers_other()
+    #tickers_nasdaq = tickers_nasdaq()
+    #all_tickers = tickers_nasdaq + tickers_nyse_amex
+
+    #undervalued_large_caps = get_undervalued_large_caps()
+
+    #get_cash_flow: yearly = True
+    cache_flow_all = []
+    #for ticker in tickers_pg:
+    #    get_cash_flow_pg(ticker)
+
+    #EXPERIMENT: getting free cash flow for 1 ticker
+    #get_cash_flow_pg('INTC')
+    #columns=["Ticker"]+["Date"] + ["FREE Cash Flow"] + cache_flow_columns.to_list()
+    #cache_flow_df = pd.DataFrame(cache_flow_statements, columns=columns)
 
 
+    dt_now = datetime.datetime.now()
+    dt_string = dt_now.strftime("%Y%m%d_%H%M%S")
+
+    for ticker in tickers_pg:
+        try:
+            get_cash_flow_pg(ticker)
+        except Exception as e:
+            print("EXCEPTION: failed to extract free cache flow for {}".format(ticker))
+
+    cache_flow_for_all_df = pd.DataFrame(cache_flow_statements_for_all, columns=cache_flow_columns_all)
+    cache_flow_for_all_df.to_csv("C:/Users/USER/Downloads/yahoo_fin_news/" + dt_string + "cache_flow.csv")
+
+    print("DONE")
+
+
+if __name__ == '__main__':
+    get_cash_flow_for_all()
 
 
 
