@@ -1066,7 +1066,7 @@ def get_cash_flow_for_all():
 
 class dividend_frequency:
     no_dividend = -1
-    anually = 1
+    annually = 1
     quarterly = 4
     monthly = 12
 
@@ -1094,7 +1094,7 @@ class dividend_card:
 
 
 def dividend_cards_to_csv(dividend_cards, file_tag):
-    dt_now = datetime.now()
+    dt_now = datetime.datetime.now()
     dt_string = dt_now.strftime("%Y%m%d_%H%M%S")
 
     dividend_cards_arr = []
@@ -1115,15 +1115,19 @@ def get_dividends_for_all():
     tickers_nyse_amex = tickers_other()
     all_tickers_nasdaq = tickers_nasdaq()
     all_tickers = all_tickers_nasdaq + tickers_nyse_amex
+    all_tickers = sorted(all_tickers)
 
     monthly = []
     quarterly = []
-    anually = []
+    annually = []
 
     dt_now = datetime.datetime.now()
     dt_year = datetime.timedelta(days=1*365)
 
+    indx = 0;
     for ticker in all_tickers:
+        indx = indx+1
+        print("processing {} ({} of {})".format(ticker,indx,len(all_tickers)))
         ticker_div_card = dividend_card(ticker)
         try:
             dividend_frame = get_dividends(ticker, dt_now - dt_year, dt_now)
@@ -1141,7 +1145,7 @@ def get_dividends_for_all():
         stock_price = get_stock_price(ticker)
         ticker_div_card.dividend_yield = ticker_div_card.payout_annual/stock_price
         if(payout_count == 1):
-            anually.append(ticker_div_card)
+            annually.append(ticker_div_card)
         if(payout_count == 4):
             ticker_div_card.payout_quarterly = ticker_div_card.payout_annual/payout_count
             quarterly.append(ticker_div_card)
@@ -1151,7 +1155,7 @@ def get_dividends_for_all():
 
     dividend_cards_to_csv(monthly, "monthly")
     dividend_cards_to_csv(quarterly, "quarterly")
-    dividend_cards_to_csv(anualy, "anualy")
+    dividend_cards_to_csv(annually, "annually")
 
     return
 
@@ -1162,5 +1166,6 @@ if __name__ == '__main__':
     get_dividends_for_all()
 
     print("MAIN done")
+
 
 
