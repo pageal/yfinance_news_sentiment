@@ -1142,7 +1142,11 @@ def get_dividends_for_all():
             payout_count = payout_count + 1
 
         ticker_div_card.frequency = payout_count
-        stock_price = get_stock_price(ticker)
+        try:
+            stock_price = get_stock_price(ticker)
+        except Exception as e:
+            print(str(e))
+            continue
         ticker_div_card.dividend_yield = ticker_div_card.payout_annual/stock_price
         if(payout_count == 1):
             annually.append(ticker_div_card)
