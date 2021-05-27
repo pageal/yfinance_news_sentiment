@@ -1,4 +1,6 @@
-- main is at yahoo_fin/news.py
+- main is 
+   + at yahoo_fin/news.py for Yahoo Finance flow
+   + at yahoo_fin/news.py for free cache flow
 - developed in PyCharm
 - libs to install in PyCharm to have this working:
    * feedparser
