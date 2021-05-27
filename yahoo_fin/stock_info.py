@@ -1034,8 +1034,8 @@ from tickers import tickers_pg
 
 def get_cash_flow_for_all():
     #tickers_nyse_amex = tickers_other()
-    #tickers_nasdaq = tickers_nasdaq()
-    #all_tickers = tickers_nasdaq + tickers_nyse_amex
+    #all_tickers_nasdaq = tickers_nasdaq()
+    #all_tickers = all_tickers_nasdaq + tickers_nyse_amex
 
     #undervalued_large_caps = get_undervalued_large_caps()
 
@@ -1064,9 +1064,103 @@ def get_cash_flow_for_all():
 
     print("DONE")
 
+class dividend_frequency:
+    no_dividend = -1
+    anually = 1
+    quarterly = 4
+    monthly = 12
+
+class dividend_card:
+    ticker = ""
+    frequency = dividend_frequency.no_dividend
+    dividend_yield = 0 #percentage–is the amount of money a company pays shareholders for owning a share of its stock divided by its current stock price
+    payout_monthly = 0
+    payout_quarterly = 0
+    payout_annual = 0
+
+    def __init__(self, ticker):
+        self.ticker = ticker
+
+    def to_array(self):
+        arr = []
+        arr.append(self.ticker)
+        arr.append(self.frequency)
+        arr.append(self.dividend_yield)
+        arr.append(self.payout_monthly)
+        arr.append(self.payout_quarterly)
+        arr.append(self.payout_annual)
+        return arr
+
+
+
+def dividend_cards_to_csv(dividend_cards, file_tag):
+    dt_now = datetime.now()
+    dt_string = dt_now.strftime("%Y%m%d_%H%M%S")
+
+    dividend_cards_arr = []
+    for dividend_card in dividend_cards:
+        dividend_cards_arr.append(dividend_card.to_array())
+    csvDataFrame = pd.DataFrame(dividend_cards_arr, columns=["ticker","frequency","dividend_yield","payout_monthly","payout_quarterly","payout_annual"])
+    csvDataFrame.to_csv("C:/Users/USER/Downloads/yahoo_fin_news/" + dt_string + "_" + file_tag + "_dividend.csv")
+
+
+def get_stock_price(ticker):
+    dt_now = datetime.datetime.now()
+    dt_week = datetime.timedelta(days=7)
+
+    data_frame = get_data(ticker, dt_now - dt_week, dt_now)
+    return data_frame["close"][data_frame.__len__() - 1]
+
+def get_dividends_for_all():
+    tickers_nyse_amex = tickers_other()
+    all_tickers_nasdaq = tickers_nasdaq()
+    all_tickers = all_tickers_nasdaq + tickers_nyse_amex
+
+    monthly = []
+    quarterly = []
+    anually = []
+
+    dt_now = datetime.datetime.now()
+    dt_year = datetime.timedelta(days=1*365)
+
+    for ticker in all_tickers:
+        ticker_div_card = dividend_card(ticker)
+        try:
+            dividend_frame = get_dividends(ticker, dt_now - dt_year, dt_now)
+        except Exception as e:
+            print(str(e))
+            continue
+
+        ticker_div_card.payout_annual = 0
+        payout_count = 0
+        for index, data_line in dividend_frame.iterrows():
+            ticker_div_card.payout_annual = ticker_div_card.payout_annual + data_line["dividend"]
+            payout_count = payout_count + 1
+
+        ticker_div_card.frequency = payout_count
+        stock_price = get_stock_price(ticker)
+        ticker_div_card.dividend_yield = ticker_div_card.payout_annual/stock_price
+        if(payout_count == 1):
+            anually.append(ticker_div_card)
+        if(payout_count == 4):
+            ticker_div_card.payout_quarterly = ticker_div_card.payout_annual/payout_count
+            quarterly.append(ticker_div_card)
+        if(payout_count == 12):
+            ticker_div_card.payout_monthly = ticker_div_card.payout_annual/payout_count
+            monthly.append(ticker_div_card)
+
+    dividend_cards_to_csv(monthly, "monthly")
+    dividend_cards_to_csv(quarterly, "quarterly")
+    dividend_cards_to_csv(anualy, "anualy")
+
+    return
+
+
 
 if __name__ == '__main__':
-    get_cash_flow_for_all()
+    #get_cash_flow_for_all()
+    get_dividends_for_all()
 
+    print("MAIN done")
 
 
