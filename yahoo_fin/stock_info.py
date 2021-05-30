@@ -1074,9 +1074,13 @@ class dividend_card:
     ticker = ""
     frequency = dividend_frequency.no_dividend
     dividend_yield = 0 #percentage–is the amount of money a company pays shareholders for owning a share of its stock divided by its current stock price
-    payout_monthly = 0
-    payout_quarterly = 0
-    payout_annual = 0
+    payout = 0
+    div_min = 0
+    div_max = 0
+    div_spread = 0      # div_max - div_min
+    price_min = 0
+    price_max = 0
+    price_spread = 0    # price_max - price_min
 
     def __init__(self, ticker):
         self.ticker = ticker
@@ -1086,11 +1090,16 @@ class dividend_card:
         arr.append(self.ticker)
         arr.append(self.frequency)
         arr.append(self.dividend_yield)
-        arr.append(self.payout_monthly)
-        arr.append(self.payout_quarterly)
-        arr.append(self.payout_annual)
+        arr.append(self.payout)
+        arr.append(self.div_min)
+        arr.append(self.div_max)
+        arr.append(self.div_spread)
+        arr.append(self.div_growth)
+        arr.append(self.price_min)
+        arr.append(self.price_max)
+        arr.append(self.price_spread)
+        arr.append(self.price_growth)
         return arr
-
 
 
 def dividend_cards_to_csv(dividend_cards, file_tag):
@@ -1100,7 +1109,9 @@ def dividend_cards_to_csv(dividend_cards, file_tag):
     dividend_cards_arr = []
     for dividend_card in dividend_cards:
         dividend_cards_arr.append(dividend_card.to_array())
-    csvDataFrame = pd.DataFrame(dividend_cards_arr, columns=["ticker","frequency","dividend_yield","payout_monthly","payout_quarterly","payout_annual"])
+    csvDataFrame = pd.DataFrame(dividend_cards_arr, columns=["ticker","frequency","dividend_yield","payout",\
+                                                             "div_min","div_max","div_spread","div_growth",\
+                                                             "price_min","price_max","price_spread","price_growth"])
     csvDataFrame.to_csv("C:/Users/USER/Downloads/yahoo_fin_news/" + dt_string + "_" + file_tag + "_dividend.csv")
 
 
@@ -1111,6 +1122,61 @@ def get_stock_price(ticker):
     data_frame = get_data(ticker, dt_now - dt_week, dt_now)
     return data_frame["close"][data_frame.__len__() - 1]
 
+def get_param_stability(param_name, data_frame):
+    min = max = total = spread = growth = 0
+    initialized = False
+    for index, data_line in data_frame.iterrows():
+        total = total + data_line[param_name]
+        if(not initialized):
+            min = data_line[param_name]
+            max = data_line[param_name]
+            initialized = True
+            continue
+
+        if(data_line[param_name] < min):
+            min = data_line[param_name]
+            continue
+
+        if(data_line[param_name] > max):
+            max = data_line[param_name]
+            continue
+    averaged_param_value = total/data_frame.__len__()
+
+    if(averaged_param_value != 0):
+        spread = (max - min)/averaged_param_value
+        growth = (data_frame[param_name][data_frame.__len__() - 1] - data_frame[param_name][0])/averaged_param_value
+    return min, max, spread, growth
+
+
+def get_dividend_stability(ticker, year_span = 5):
+    dt_now = datetime.datetime.now()
+    dt_time_span = datetime.timedelta(days=year_span*365)
+    min = max = spread = growth = 0
+    try:
+        data_frame = get_dividends(ticker, dt_now - dt_time_span, dt_now)
+    except Exception as e:
+        print(str(e))
+        return min, max, spread, growth
+
+    min, max, spread, growth = get_param_stability("dividend", data_frame)
+    return min, max, spread, growth
+
+
+def get_price_stability(ticker, year_span = 5):
+    dt_now = datetime.datetime.now()
+    dt_time_span = datetime.timedelta(days=year_span*365)
+    min = max = spread = growth = 0
+
+    try:
+        data_frame = get_data(ticker, dt_now - dt_time_span, dt_now)
+    except Exception as e:
+        print(str(e))
+        return min, max, spread, growth
+    min, max, spread, growth =  get_param_stability("close", data_frame)
+    return min, max, spread, growth
+
+
+# extract dividend payment metrics: yield, monthly/yearly/daily payment type
 def get_dividends_for_all():
     tickers_nyse_amex = tickers_other()
     all_tickers_nasdaq = tickers_nasdaq()
@@ -1148,14 +1214,16 @@ def get_dividends_for_all():
             print(str(e))
             continue
         ticker_div_card.dividend_yield = ticker_div_card.payout_annual/stock_price
+        ticker_div_card.payout = ticker_div_card.payout_annual / payout_count
         if(payout_count == 1):
             annually.append(ticker_div_card)
         if(payout_count == 4):
-            ticker_div_card.payout_quarterly = ticker_div_card.payout_annual/payout_count
             quarterly.append(ticker_div_card)
         if(payout_count == 12):
-            ticker_div_card.payout_monthly = ticker_div_card.payout_annual/payout_count
             monthly.append(ticker_div_card)
+
+        ticker_div_card.div_min, ticker_div_card.div_max, ticker_div_card.div_spread, ticker_div_card.div_growth = get_dividend_stability(ticker)
+        ticker_div_card.price_min, ticker_div_card.price_max, ticker_div_card.price_spread, ticker_div_card.price_growth = get_price_stability(ticker)
 
     dividend_cards_to_csv(monthly, "monthly")
     dividend_cards_to_csv(quarterly, "quarterly")
